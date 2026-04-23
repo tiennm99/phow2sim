@@ -137,23 +137,13 @@ docker compose down -v && docker compose up --build
 
 | Var | Default | Meaning |
 |---|---|---|
-| `MODEL_URL` | *(required)* | Any URL that serves the zip via a plain GET. Bake any auth into the URL. |
-| `MODEL_PATH` | `/data/phow2v/word2vec_vi_words_300dims.txt` | Where the text-format vectors are persisted. |
+| `MODEL_URL` | `""` | URL that serves the zip via a plain GET. Bake any auth into the URL. Optional if `MODEL_PATH` is already populated via a bind mount. |
+| `MODEL_PATH` | `/data/phow2v/word2vec_vi_words_300dims.txt` | Where the text-format vectors live. A binary `.bin` sibling is written on first parse. |
 
-## Using from doantu (miti99bot)
+## Auth
 
-The Cloudflare Worker module's `api-client.js` already produces the same
-response shape. Replace `embedPair` + local cosine with a single `fetch`:
-
-```js
-const url = `${env.PHOW2SIM_URL}/similarity?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`;
-const resp = await fetch(url, { headers: { Authorization: `Bearer ${env.PHOW2SIM_TOKEN}` } });
-return await resp.json();  // { in_vocab_a, in_vocab_b, similarity, ... }
-```
-
-Auth is **not** built-in here — add a reverse proxy (Caddy, Cloudflare
-Tunnel, or nginx) in front that checks a bearer token before passing
-through. The service itself trusts its caller.
+The service does not authenticate its callers. Put it behind a reverse
+proxy (Caddy, nginx, Cloudflare Tunnel) if you need access control.
 
 ## Project layout
 
@@ -165,7 +155,7 @@ phow2sim/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
-└── .env.example      # copy to .env and fill in Nextcloud creds
+└── .env.example      # copy to .env and set MODEL_URL
 ```
 
 ## Credits
