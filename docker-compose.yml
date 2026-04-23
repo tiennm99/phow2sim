@@ -1,0 +1,20 @@
+services:
+  phow2sim:
+    build: .
+    ports:
+      - "8001:8000"
+    environment:
+      # Variant: "word" (multi-syllable compounds, ~1.2GB) or "syllable" (single-syllable, ~150MB).
+      # To switch to syllables override all three:
+      #   MODEL_URL: https://public.vinai.io/word2vec_vi_syllables_300dims.zip
+      #   MODEL_PATH: /data/phow2v/word2vec_vi_syllables_300dims.txt
+      #   MODEL_VARIANT: syllable
+      MODEL_URL: ${MODEL_URL:-https://public.vinai.io/word2vec_vi_words_300dims.zip}
+      MODEL_PATH: ${MODEL_PATH:-/data/phow2v/word2vec_vi_words_300dims.txt}
+      MODEL_VARIANT: ${MODEL_VARIANT:-word}
+    volumes:
+      - phow2v-cache:/data/phow2v
+    restart: unless-stopped
+
+volumes:
+  phow2v-cache:
