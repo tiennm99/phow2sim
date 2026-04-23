@@ -9,10 +9,16 @@ use the fast binary path.
 Tokenization matters. The "word" variant expects underscore-joined
 compounds ("sinh_viên"); the "syllable" variant expects single syllables
 ("sinh", "viên"). Callers must normalize to match before querying.
+
+Model source: PhoW2V's research license forbids public redistribution,
+so MODEL_URL is expected to point at a private, auth-gated mirror
+(typically Nextcloud WebDAV). HTTP Basic auth is applied when
+MODEL_DOWNLOAD_USER / MODEL_DOWNLOAD_PASSWORD are set.
 """
 
 from __future__ import annotations
 
+import base64
 import os
 import random as _random
 import unicodedata
@@ -24,20 +30,45 @@ from typing import Optional
 from gensim.models import KeyedVectors
 
 _MODEL: Optional[KeyedVectors] = None
+_DOWNLOAD_CHUNK = 1 << 20  # 1 MiB; keeps peak RAM flat for ~1GB downloads.
+
+
+def _build_request(url: str) -> urllib.request.Request:
+    """Build a GET with optional Basic auth from env. WebDAV-friendly."""
+    req = urllib.request.Request(url)
+    user = os.environ.get("MODEL_DOWNLOAD_USER", "")
+    password = os.environ.get("MODEL_DOWNLOAD_PASSWORD")
+    # Password-only (empty user) covers Nextcloud public-share passwords too.
+    if password is not None:
+        creds = base64.b64encode(f"{user}:{password}".encode()).decode("ascii")
+        req.add_header("Authorization", f"Basic {creds}")
+    return req
 
 
 def _download_and_extract(url: str, target_txt: Path) -> None:
-    """Fetch a PhoW2V zip and extract its .txt into target_txt."""
+    """Fetch a PhoW2V zip (streamed) and extract its .txt into target_txt."""
     target_txt.parent.mkdir(parents=True, exist_ok=True)
     zip_path = target_txt.with_suffix(".zip")
-    urllib.request.urlretrieve(url, zip_path)
+
+    req = _build_request(url)
+    with urllib.request.urlopen(req) as resp, open(zip_path, "wb") as dst:
+        while True:
+            chunk = resp.read(_DOWNLOAD_CHUNK)
+            if not chunk:
+                break
+            dst.write(chunk)
+
     with zipfile.ZipFile(zip_path) as zf:
         txt_members = [m for m in zf.namelist() if m.endswith(".txt")]
         if not txt_members:
             raise RuntimeError(f"no .txt file inside {url}")
         # Flatten into target_txt regardless of archive's internal layout.
         with zf.open(txt_members[0]) as src, open(target_txt, "wb") as dst:
-            dst.write(src.read())
+            while True:
+                chunk = src.read(_DOWNLOAD_CHUNK)
+                if not chunk:
+                    break
+                dst.write(chunk)
     zip_path.unlink(missing_ok=True)
 
 

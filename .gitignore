@@ -7,3 +7,5 @@ venv/
 models/
 *.zip
 *.txt.bin
+plans/
+docs/

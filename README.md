@@ -4,11 +4,17 @@ Tiny HTTP service that returns Vietnamese word2vec similarity and nearest
 neighbors — Vietnamese sibling of [`word2sim`](../word2sim). Same endpoint
 shapes; swap URLs and it's a drop-in replacement.
 
-Backed by [**PhoW2V**](https://github.com/VinAIResearch/PhoW2V) (VinAI), the
-largest pretrained Vietnamese word vectors available. Chosen over PhoBERT
-for this purpose because word2vec's similarity distribution is wide
-enough to drive a Semantle-style warmth meter, whereas raw transformer
-embeddings saturate at the top.
+Backed by [**PhoW2V**](https://github.com/datquocnguyen/PhoW2V) (VinAI /
+Dat Quoc Nguyen), the largest pretrained Vietnamese word vectors
+available. Chosen over PhoBERT for this purpose because word2vec's
+similarity distribution is wide enough to drive a Semantle-style warmth
+meter, whereas raw transformer embeddings saturate at the top.
+
+> **License note.** PhoW2V's research-only license forbids public
+> redistribution, so this service doesn't — and can't — embed or
+> auto-download the vectors from any public URL. You supply your own
+> private mirror (typically a Nextcloud instance you control). See
+> [Quick start](#quick-start).
 
 ## Stack
 
@@ -63,45 +69,74 @@ tries exact → lowercase → space-to-underscore variants.
 
 ## Quick start
 
-```bash
-docker compose up --build
-# First boot downloads ~1.2GB (word-300d) into the `phow2v-cache` volume.
-# Model parse ~60s. A binary cache is written on first success so later
-# restarts take ~10s.
+1. **Get the vectors once.** Download from the [upstream Google Drive
+   mirror](https://drive.google.com/drive/folders/1NZhZFYbcwKzLpvvGdJUdPbwEVdVW4E3j?usp=drive_link)
+   (the one linked from the PhoW2V README — the original
+   `public.vinai.io` URLs are dead). You'll get four zips; keep the one
+   matching your chosen variant.
+
+2. **Upload the zip to your Nextcloud** in a folder like `phow2v/`. In
+   Nextcloud → Settings → Security, generate an **app password** for
+   this service (do not use your real login password, and do not disable
+   2FA if you use it).
+
+3. **Configure env.** Copy `.env.example` to `.env` and fill in:
+   ```bash
+   cp .env.example .env
+   # then edit .env:
+   #   MODEL_URL=https://cloud.example.com/remote.php/dav/files/<user>/phow2v/word2vec_vi_words_300dims.zip
+   #   MODEL_DOWNLOAD_USER=<nextcloud-username>
+   #   MODEL_DOWNLOAD_PASSWORD=<app-password>
+   ```
+
+4. **Boot.**
+   ```bash
+   docker compose up --build
+   ```
+   First boot streams ~1.2GB (word-300d) from Nextcloud into the
+   `phow2v-cache` volume, then parses ~60s. A binary `.bin` is written
+   alongside so later restarts load in ~10s. Health check start period
+   is 10 min to cover the first-boot cost.
+
+### Using a public share instead of WebDAV
+
+If you'd rather create a password-protected Nextcloud share link:
+
+```
+MODEL_URL=https://cloud.example.com/s/<shareToken>/download
+MODEL_DOWNLOAD_USER=
+MODEL_DOWNLOAD_PASSWORD=<share-password>
 ```
 
-Health check start period is 10 min to cover the download + parse.
+Basic auth with an empty username is how Nextcloud authenticates a
+public-share password.
 
 ## Switching variant
 
-Edit `docker-compose.yml` or pass env:
+Upload the desired zip to Nextcloud, then update `.env`:
 
 ```bash
-MODEL_URL=https://public.vinai.io/word2vec_vi_syllables_100dims.zip \
-MODEL_PATH=/data/phow2v/word2vec_vi_syllables_100dims.txt \
-MODEL_VARIANT=syllable \
-docker compose up --build
+MODEL_URL=https://cloud.example.com/remote.php/dav/files/<user>/phow2v/word2vec_vi_syllables_100dims.zip
+MODEL_PATH=/data/phow2v/word2vec_vi_syllables_100dims.txt
+MODEL_VARIANT=syllable
 ```
 
 Delete the `phow2v-cache` volume when switching, otherwise the stale
-`.bin` from the previous variant will load instead.
-
-## Manual model population
-
-Skip the auto-download if you want to prepare the volume ahead of time:
+`.bin` from the previous variant will load instead:
 
 ```bash
-./scripts/download-phow2v.sh word 300        # word-300d into ./models
-# then mount ./models as /data/phow2v in docker-compose.yml
+docker compose down -v && docker compose up --build
 ```
 
 ## Config (env vars)
 
 | Var | Default | Meaning |
 |---|---|---|
-| `MODEL_URL` | `https://public.vinai.io/word2vec_vi_words_300dims.zip` | fetched on first boot if `MODEL_PATH` absent |
-| `MODEL_PATH` | `/data/phow2v/word2vec_vi_words_300dims.txt` | where the text-format vectors live |
-| `MODEL_VARIANT` | `word` | declarative hint for the caller; `word` or `syllable` |
+| `MODEL_URL` | *(required)* | Private URL to the PhoW2V zip. WebDAV or Nextcloud public-share `/download` URL. |
+| `MODEL_DOWNLOAD_USER` | `""` | Basic-auth user. Empty for Nextcloud public-share password auth. |
+| `MODEL_DOWNLOAD_PASSWORD` | *(required)* | Basic-auth password — Nextcloud app password, or share password. |
+| `MODEL_PATH` | `/data/phow2v/word2vec_vi_words_300dims.txt` | Where the text-format vectors are persisted. |
+| `MODEL_VARIANT` | `word` | `word` or `syllable`. Declarative hint; must match the file you uploaded. |
 
 ## Using from doantu (miti99bot)
 
@@ -125,14 +160,13 @@ phow2sim/
 ├── app/
 │   ├── main.py       # FastAPI routes
 │   └── vectors.py    # PhoW2V loader + canonicalize + similarity/neighbors/random
-├── scripts/
-│   └── download-phow2v.sh
 ├── Dockerfile
 ├── docker-compose.yml
-└── requirements.txt
+├── requirements.txt
+└── .env.example      # copy to .env and fill in Nextcloud creds
 ```
 
 ## Credits
 
-- Vectors: [PhoW2V](https://github.com/VinAIResearch/PhoW2V) by VinAI Research (research license — see their repo).
+- Vectors: [PhoW2V](https://github.com/datquocnguyen/PhoW2V) by Dat Quoc Nguyen / VinAI Research (research-only license — see upstream).
 - API shape: sibling of [`word2sim`](../word2sim).
