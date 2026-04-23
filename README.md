@@ -103,6 +103,20 @@ tries exact → lowercase → space-to-underscore variants.
    restarts load in ~10s. Health check start period is 10 min to cover
    the first-boot cost.
 
+### Alternative: mount a local file instead
+
+If you've already downloaded the `.txt` locally and don't want to
+re-upload anywhere, skip `MODEL_URL` entirely and mount the file. In
+`docker-compose.yml`, uncomment the bind mount:
+
+```yaml
+volumes:
+  - phow2v-cache:/data/phow2v
+  - ./models/word2vec_vi_words_300dims.txt:/data/phow2v/word2vec_vi_words_300dims.txt:ro
+```
+
+Then `docker compose up` boots straight into parse — no download step.
+
 ## Switching variant
 
 Host the desired zip and update `.env`:

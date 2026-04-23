@@ -1,18 +1,20 @@
 services:
   phow2sim:
     build: .
+    container_name: phow2sim
     ports:
       - "8001:8000"
     environment:
-      # MODEL_URL: a URL that serves the PhoW2V zip with a plain GET.
-      # Any auth (share token, signed URL, etc.) must be encoded in the
-      # URL itself — the service does not send Authorization headers.
-      # Example (Nextcloud public share):
-      #   https://cloud.example.com/s/<shareToken>/download
-      MODEL_URL: ${MODEL_URL:?set MODEL_URL in .env to your PhoW2V zip URL}
+      # URL serving the PhoW2V zip with a plain GET. Any auth goes in
+      # the URL itself (share token, signed URL, etc.) — the service
+      # sends no Authorization header. Leave empty only if you've
+      # pre-populated the volume (see the volume mount below).
+      MODEL_URL: ${MODEL_URL:-}
       MODEL_PATH: ${MODEL_PATH:-/data/phow2v/word2vec_vi_words_300dims.txt}
     volumes:
       - phow2v-cache:/data/phow2v
+      # Or mount a locally-downloaded .txt and skip MODEL_URL entirely:
+      # - ./models/word2vec_vi_words_300dims.txt:/data/phow2v/word2vec_vi_words_300dims.txt:ro
     restart: unless-stopped
 
 volumes:

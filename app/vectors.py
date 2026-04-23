@@ -75,10 +75,11 @@ def load_model() -> KeyedVectors:
         return _MODEL
 
     if not txt_path.exists():
-        url = os.environ.get("MODEL_URL")
+        url = os.environ.get("MODEL_URL", "").strip()
         if not url:
             raise FileNotFoundError(
-                f"MODEL_PATH {txt_path} missing and no MODEL_URL set for auto-download"
+                f"no vectors at MODEL_PATH={txt_path}; set MODEL_URL in .env "
+                f"(or mount a local .txt into {txt_path.parent}) and retry"
             )
         _download_and_extract(url, txt_path)
 
