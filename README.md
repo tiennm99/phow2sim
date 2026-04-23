@@ -110,7 +110,6 @@ Host the desired zip and update `.env`:
 ```bash
 MODEL_URL=https://cloud.example.com/s/<token-for-syllables-100>/download
 MODEL_PATH=/data/phow2v/word2vec_vi_syllables_100dims.txt
-MODEL_VARIANT=syllable
 ```
 
 Delete the `phow2v-cache` volume when switching, otherwise the stale
@@ -126,7 +125,6 @@ docker compose down -v && docker compose up --build
 |---|---|---|
 | `MODEL_URL` | *(required)* | Any URL that serves the zip via a plain GET. Bake any auth into the URL. |
 | `MODEL_PATH` | `/data/phow2v/word2vec_vi_words_300dims.txt` | Where the text-format vectors are persisted. |
-| `MODEL_VARIANT` | `word` | `word` or `syllable`. Declarative hint; must match the file you uploaded. |
 
 ## Using from doantu (miti99bot)
 

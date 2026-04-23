@@ -11,7 +11,6 @@ services:
       #   https://cloud.example.com/s/<shareToken>/download
       MODEL_URL: ${MODEL_URL:?set MODEL_URL in .env to your PhoW2V zip URL}
       MODEL_PATH: ${MODEL_PATH:-/data/phow2v/word2vec_vi_words_300dims.txt}
-      MODEL_VARIANT: ${MODEL_VARIANT:-word}
     volumes:
       - phow2v-cache:/data/phow2v
     restart: unless-stopped
