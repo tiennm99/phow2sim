@@ -2,8 +2,9 @@ services:
   phow2sim:
     build: .
     container_name: phow2sim
-    ports:
-      - "8001:8000"
+    # uncomment to expose this port on the host
+    # ports:
+    #   - "8001:8000"
     environment:
       # URL serving the PhoW2V zip with a plain GET. Any auth goes in
       # the URL itself (share token, signed URL, etc.) — the service
