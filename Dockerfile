@@ -16,7 +16,8 @@ COPY app ./app
 # PhoW2V's license forbids public redistribution, so every deployment
 # must point at its own private mirror (typically Nextcloud WebDAV).
 ENV MODEL_PATH=/data/phow2v/word2vec_vi_words_300dims.txt \
-    PORT=8000
+    PORT=8000 \
+    PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 

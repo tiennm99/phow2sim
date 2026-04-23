@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import os
 import random as _random
+import sys
+import time
 import unicodedata
 import urllib.request
 import zipfile
@@ -32,6 +34,14 @@ from gensim.models import KeyedVectors
 
 _MODEL: Optional[KeyedVectors] = None
 _DOWNLOAD_CHUNK = 1 << 20  # 1 MiB; keeps peak RAM flat for ~1GB downloads.
+_LOG_EVERY_MB = 50  # Print a progress line every ~50 MiB so the operator knows it's alive.
+
+
+def _log(msg: str) -> None:
+    """Uvicorn doesn't surface our logger at INFO by default, and the lifespan
+    runs before any log config the operator might add — print with flush so
+    'docker compose logs' shows progress in real time."""
+    print(f"[phow2sim] {msg}", file=sys.stdout, flush=True)
 
 
 def _download_and_extract(url: str, target_txt: Path) -> None:
@@ -39,13 +49,29 @@ def _download_and_extract(url: str, target_txt: Path) -> None:
     target_txt.parent.mkdir(parents=True, exist_ok=True)
     zip_path = target_txt.with_suffix(".zip")
 
+    _log(f"downloading model zip from {url}")
+    t0 = time.monotonic()
     with urllib.request.urlopen(url) as resp, open(zip_path, "wb") as dst:
+        total = int(resp.headers.get("Content-Length") or 0)
+        total_mb = total / (1 << 20) if total else 0.0
+        downloaded = 0
+        next_log = _LOG_EVERY_MB << 20
         while True:
             chunk = resp.read(_DOWNLOAD_CHUNK)
             if not chunk:
                 break
             dst.write(chunk)
+            downloaded += len(chunk)
+            if downloaded >= next_log:
+                mb = downloaded / (1 << 20)
+                if total_mb:
+                    _log(f"  downloaded {mb:.0f} / {total_mb:.0f} MiB ({downloaded * 100.0 / total:.0f}%)")
+                else:
+                    _log(f"  downloaded {mb:.0f} MiB")
+                next_log += _LOG_EVERY_MB << 20
+    _log(f"download complete in {time.monotonic() - t0:.1f}s ({downloaded / (1 << 20):.0f} MiB)")
 
+    _log(f"extracting .txt from {zip_path.name}")
     with zipfile.ZipFile(zip_path) as zf:
         txt_members = [m for m in zf.namelist() if m.endswith(".txt")]
         if not txt_members:
@@ -58,6 +84,7 @@ def _download_and_extract(url: str, target_txt: Path) -> None:
                     break
                 dst.write(chunk)
     zip_path.unlink(missing_ok=True)
+    _log(f"extracted to {target_txt}")
 
 
 def load_model() -> KeyedVectors:
@@ -71,7 +98,10 @@ def load_model() -> KeyedVectors:
 
     # Prefer the cached binary form for ~5x faster cold start.
     if bin_cache.exists():
+        _log(f"loading cached binary vectors from {bin_cache}")
+        t0 = time.monotonic()
         _MODEL = KeyedVectors.load_word2vec_format(str(bin_cache), binary=True)
+        _log(f"loaded {len(_MODEL)} keys in {time.monotonic() - t0:.1f}s")
         return _MODEL
 
     if not txt_path.exists():
@@ -83,12 +113,17 @@ def load_model() -> KeyedVectors:
             )
         _download_and_extract(url, txt_path)
 
+    _log(f"parsing text-format vectors from {txt_path} (typically ~60s for word-300d)")
+    t0 = time.monotonic()
     _MODEL = KeyedVectors.load_word2vec_format(str(txt_path), binary=False)
+    _log(f"parsed {len(_MODEL)} keys in {time.monotonic() - t0:.1f}s")
+
     # Persist the fast-load cache next to the source .txt.
     try:
+        _log(f"writing binary cache to {bin_cache} for faster future starts")
         _MODEL.save_word2vec_format(str(bin_cache), binary=True)
-    except OSError:
-        pass  # Read-only volume is fine; we'll just pay the txt-parse cost again.
+    except OSError as e:
+        _log(f"warning: could not write binary cache ({e}); will re-parse .txt next time")
     return _MODEL
 
 
