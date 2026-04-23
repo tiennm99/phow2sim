@@ -72,57 +72,49 @@ tries exact → lowercase → space-to-underscore variants.
 1. **Get the vectors once.** Download from the [upstream Google Drive
    mirror](https://drive.google.com/drive/folders/1NZhZFYbcwKzLpvvGdJUdPbwEVdVW4E3j?usp=drive_link)
    (the one linked from the PhoW2V README — the original
-   `public.vinai.io` URLs are dead). You'll get four zips; keep the one
-   matching your chosen variant.
+   `public.vinai.io` URLs are dead). Four zips; keep the one matching
+   your chosen variant.
 
-2. **Upload the zip to your Nextcloud** in a folder like `phow2v/`. In
-   Nextcloud → Settings → Security, generate an **app password** for
-   this service (do not use your real login password, and do not disable
-   2FA if you use it).
+2. **Host the zip somewhere a plain `GET` can reach it.** Options:
+   - **Nextcloud public share** with file upload, then use the
+     `/download` endpoint: `https://cloud.example.com/s/<token>/download`.
+     The share token acts as the capability; leave it unguessable and
+     unlisted.
+   - Any signed/pre-signed URL from your object store (S3, R2,
+     BackBlaze B2), or your own HTTP(S) endpoint.
 
-3. **Configure env.** Copy `.env.example` to `.env` and fill in:
+   The service sends **no auth headers** — any authentication must be
+   baked into the URL itself. This keeps the code minimal and puts
+   hosting policy on the operator.
+
+3. **Configure env.** Copy `.env.example` to `.env` and set `MODEL_URL`:
    ```bash
    cp .env.example .env
-   # then edit .env:
-   #   MODEL_URL=https://cloud.example.com/remote.php/dav/files/<user>/phow2v/word2vec_vi_words_300dims.zip
-   #   MODEL_DOWNLOAD_USER=<nextcloud-username>
-   #   MODEL_DOWNLOAD_PASSWORD=<app-password>
+   # edit .env:
+   #   MODEL_URL=https://cloud.example.com/s/abc123XYZ/download
    ```
 
 4. **Boot.**
    ```bash
    docker compose up --build
    ```
-   First boot streams ~1.2GB (word-300d) from Nextcloud into the
-   `phow2v-cache` volume, then parses ~60s. A binary `.bin` is written
-   alongside so later restarts load in ~10s. Health check start period
-   is 10 min to cover the first-boot cost.
-
-### Using a public share instead of WebDAV
-
-If you'd rather create a password-protected Nextcloud share link:
-
-```
-MODEL_URL=https://cloud.example.com/s/<shareToken>/download
-MODEL_DOWNLOAD_USER=
-MODEL_DOWNLOAD_PASSWORD=<share-password>
-```
-
-Basic auth with an empty username is how Nextcloud authenticates a
-public-share password.
+   First boot streams ~1.2GB (word-300d) into the `phow2v-cache` volume,
+   then parses ~60s. A binary `.bin` is written alongside so later
+   restarts load in ~10s. Health check start period is 10 min to cover
+   the first-boot cost.
 
 ## Switching variant
 
-Upload the desired zip to Nextcloud, then update `.env`:
+Host the desired zip and update `.env`:
 
 ```bash
-MODEL_URL=https://cloud.example.com/remote.php/dav/files/<user>/phow2v/word2vec_vi_syllables_100dims.zip
+MODEL_URL=https://cloud.example.com/s/<token-for-syllables-100>/download
 MODEL_PATH=/data/phow2v/word2vec_vi_syllables_100dims.txt
 MODEL_VARIANT=syllable
 ```
 
 Delete the `phow2v-cache` volume when switching, otherwise the stale
-`.bin` from the previous variant will load instead:
+`.bin` from the previous variant loads instead:
 
 ```bash
 docker compose down -v && docker compose up --build
@@ -132,9 +124,7 @@ docker compose down -v && docker compose up --build
 
 | Var | Default | Meaning |
 |---|---|---|
-| `MODEL_URL` | *(required)* | Private URL to the PhoW2V zip. WebDAV or Nextcloud public-share `/download` URL. |
-| `MODEL_DOWNLOAD_USER` | `""` | Basic-auth user. Empty for Nextcloud public-share password auth. |
-| `MODEL_DOWNLOAD_PASSWORD` | *(required)* | Basic-auth password — Nextcloud app password, or share password. |
+| `MODEL_URL` | *(required)* | Any URL that serves the zip via a plain GET. Bake any auth into the URL. |
 | `MODEL_PATH` | `/data/phow2v/word2vec_vi_words_300dims.txt` | Where the text-format vectors are persisted. |
 | `MODEL_VARIANT` | `word` | `word` or `syllable`. Declarative hint; must match the file you uploaded. |
 

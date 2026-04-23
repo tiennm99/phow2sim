@@ -4,20 +4,14 @@ services:
     ports:
       - "8001:8000"
     environment:
-      # MODEL_URL is a Nextcloud WebDAV (or public-share+password) URL to a
-      # PhoW2V .zip. Example WebDAV path:
-      #   https://cloud.example.com/remote.php/dav/files/<user>/phow2v/word2vec_vi_words_300dims.zip
-      # Example public share (password-protected):
-      #   https://cloud.example.com/s/<token>/download  (leave MODEL_DOWNLOAD_USER empty)
-      MODEL_URL: ${MODEL_URL:?set MODEL_URL in .env to your Nextcloud zip}
+      # MODEL_URL: a URL that serves the PhoW2V zip with a plain GET.
+      # Any auth (share token, signed URL, etc.) must be encoded in the
+      # URL itself — the service does not send Authorization headers.
+      # Example (Nextcloud public share):
+      #   https://cloud.example.com/s/<shareToken>/download
+      MODEL_URL: ${MODEL_URL:?set MODEL_URL in .env to your PhoW2V zip URL}
       MODEL_PATH: ${MODEL_PATH:-/data/phow2v/word2vec_vi_words_300dims.txt}
       MODEL_VARIANT: ${MODEL_VARIANT:-word}
-      # Basic-auth for the MODEL_URL. For Nextcloud WebDAV use the Nextcloud
-      # username + an app-password (not your login password). For a
-      # password-protected public share, leave MODEL_DOWNLOAD_USER empty
-      # and put the share password in MODEL_DOWNLOAD_PASSWORD.
-      MODEL_DOWNLOAD_USER: ${MODEL_DOWNLOAD_USER:-}
-      MODEL_DOWNLOAD_PASSWORD: ${MODEL_DOWNLOAD_PASSWORD:?set MODEL_DOWNLOAD_PASSWORD in .env}
     volumes:
       - phow2v-cache:/data/phow2v
     restart: unless-stopped

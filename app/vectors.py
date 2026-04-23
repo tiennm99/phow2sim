@@ -11,14 +11,15 @@ compounds ("sinh_viên"); the "syllable" variant expects single syllables
 ("sinh", "viên"). Callers must normalize to match before querying.
 
 Model source: PhoW2V's research license forbids public redistribution,
-so MODEL_URL is expected to point at a private, auth-gated mirror
-(typically Nextcloud WebDAV). HTTP Basic auth is applied when
-MODEL_DOWNLOAD_USER / MODEL_DOWNLOAD_PASSWORD are set.
+so MODEL_URL is expected to point at a mirror the operator controls
+(e.g. a Nextcloud share with an unguessable token in the URL, a signed
+cloud-storage URL, or any HTTP(S) endpoint that serves the zip with a
+GET). The service does a plain GET — any auth must be baked into the
+URL itself.
 """
 
 from __future__ import annotations
 
-import base64
 import os
 import random as _random
 import unicodedata
@@ -33,25 +34,12 @@ _MODEL: Optional[KeyedVectors] = None
 _DOWNLOAD_CHUNK = 1 << 20  # 1 MiB; keeps peak RAM flat for ~1GB downloads.
 
 
-def _build_request(url: str) -> urllib.request.Request:
-    """Build a GET with optional Basic auth from env. WebDAV-friendly."""
-    req = urllib.request.Request(url)
-    user = os.environ.get("MODEL_DOWNLOAD_USER", "")
-    password = os.environ.get("MODEL_DOWNLOAD_PASSWORD")
-    # Password-only (empty user) covers Nextcloud public-share passwords too.
-    if password is not None:
-        creds = base64.b64encode(f"{user}:{password}".encode()).decode("ascii")
-        req.add_header("Authorization", f"Basic {creds}")
-    return req
-
-
 def _download_and_extract(url: str, target_txt: Path) -> None:
     """Fetch a PhoW2V zip (streamed) and extract its .txt into target_txt."""
     target_txt.parent.mkdir(parents=True, exist_ok=True)
     zip_path = target_txt.with_suffix(".zip")
 
-    req = _build_request(url)
-    with urllib.request.urlopen(req) as resp, open(zip_path, "wb") as dst:
+    with urllib.request.urlopen(url) as resp, open(zip_path, "wb") as dst:
         while True:
             chunk = resp.read(_DOWNLOAD_CHUNK)
             if not chunk:
